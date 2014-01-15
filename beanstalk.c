@@ -27,10 +27,25 @@
 #include "ext/standard/info.h"
 #include "ext/standard/php_string.h"
 #include "php_beanstalk.h"
+#include <unistd.h>
 
 #ifndef ZEND_ENGINE_2
 #define OnUpdateLong OnUpdateInt
 #endif
+
+// try to reconnect server after 3 seconds, if connect failed throw exception
+#define CMD_POLL_CHECK_CONNECT(svr, r, w) \
+	cmd_poll(svr, r, w); \
+	if(svr->state == BSC_STATE_DISCONNECTED) { \
+		char errorstr[BSC_ERRSTR_LEN]; \
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "%s:%s disconnected, try to reconnect after 3s ... ", svr->host, svr->port); \
+		sleep(3); \
+		if(!bsc_reconnect(svr, errorstr)) { \
+			zend_throw_exception_ex(NULL, 0 TSRMLS_CC, "%s:%s disconnected, plz try to reconnect", svr->host, svr->port); \
+			return false; \
+		} \
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "reconnect to %s:%s success", svr->host, svr->port); \
+	}
 
 /* If you declare any globals in php_beanstalk.h uncomment this:
 ZEND_DECLARE_MODULE_GLOBALS(beanstalk)
@@ -164,7 +179,6 @@ static void php_bsc_failure_callback(bsc_pool_t *, bsc *, void * TSRMLS_DC);
 /* }}} */
 
 /* {{{ php_beanstalk_init_globals
- */
 /* Uncomment this function if you have INI entries
 static void php_beanstalk_init_globals(zend_beanstalk_globals *beanstalk_globals)
 {
@@ -526,7 +540,8 @@ bool cmd_use(bsc *svr, char *tube, int tube_len)
 
     while (!use_flag)
     {   
-        cmd_poll(svr, &readset, &writeset);
+        //cmd_poll(svr, &readset, &writeset);
+		CMD_POLL_CHECK_CONNECT(svr, &readset, &writeset);
     }
 
 	return true;
@@ -597,7 +612,8 @@ bool cmd_put(bsc *svr, char *value, int value_len, int prority, int delay, int t
 
     while (!put_flag)
 	{
-        cmd_poll(svr, &readset, &writeset);
+        //cmd_poll(svr, &readset, &writeset);
+        CMD_POLL_CHECK_CONNECT(svr, &readset, &writeset);
 	}
 
 	return true;
@@ -674,7 +690,8 @@ bool cmd_watch(bsc *svr, char *tube, int tube_len)
 
     while (!wtch_flag)
     {   
-        cmd_poll(svr, &readset, &writeset);
+        //cmd_poll(svr, &readset, &writeset);
+        CMD_POLL_CHECK_CONNECT(svr, &readset, &writeset);
     }
 
 	return true;
@@ -747,7 +764,8 @@ bool cmd_ignore(bsc *svr, char *tube, int tube_len)
 
     while (!ign_flag)
     {   
-        cmd_poll(svr, &readset, &writeset);
+        //cmd_poll(svr, &readset, &writeset);
+        CMD_POLL_CHECK_CONNECT(svr, &readset, &writeset);
     }
 
 	return true;
@@ -819,7 +837,8 @@ bool cmd_reserve(bsc *svr, int timeout)
     FD_ZERO(&writeset);
 
     while (!rsv_flag) {
-        cmd_poll(svr, &readset, &writeset); 
+        //cmd_poll(svr, &readset, &writeset); 
+        CMD_POLL_CHECK_CONNECT(svr, &readset, &writeset);
     }
 
 	return true;
@@ -896,7 +915,8 @@ bool cmd_bury(bsc *svr, int job_id)
 
     while (!bury_flag)
     {   
-        cmd_poll(svr, &readset, &writeset);
+        //cmd_poll(svr, &readset, &writeset);
+        CMD_POLL_CHECK_CONNECT(svr, &readset, &writeset);
     }
 
 	return true;
@@ -969,7 +989,8 @@ bool cmd_kick(bsc *svr, int bound)
 
     while (!kick_flag)
     {   
-        cmd_poll(svr, &readset, &writeset);
+        //cmd_poll(svr, &readset, &writeset);
+        CMD_POLL_CHECK_CONNECT(svr, &readset, &writeset);
     }
 
 	return true;
@@ -1042,7 +1063,8 @@ bool cmd_delete(bsc *svr, int job_id)
 
     while (!dlt_flag)
     {   
-        cmd_poll(svr, &readset, &writeset);
+        //cmd_poll(svr, &readset, &writeset);
+        CMD_POLL_CHECK_CONNECT(svr, &readset, &writeset);
     }
 
 	return true;
@@ -1115,7 +1137,8 @@ bool cmd_list_tubes(bsc *svr)
 
     while (!lst_flag)
     {   
-        cmd_poll(svr, &readset, &writeset);
+        //cmd_poll(svr, &readset, &writeset);
+        CMD_POLL_CHECK_CONNECT(svr, &readset, &writeset);
     }
 
 	return true;
